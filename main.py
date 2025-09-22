@@ -1,27 +1,40 @@
-from telegram import Update
-from telegram.ext import Updater, MessageHandler, CommandHandler, Filters, CallbackContext
+# Требования: pip install aiogram==3.1.0
+import os
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.types import Message
+from aiogram.utils.keyboard import ReplyKeyboardRemove
+import asyncio
 
-BOT_TOKEN = "7741854679:AAHNSANHs5GhlbuVm_hnOT90-Vrb1gJP1Vs"
-ADMIN_CHAT_ID = 7832676475  # твой Telegram id
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text("Отправь мне анонимное сообщение — я передам его админу ✅")
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
 
-def handle_text(update: Update, context: CallbackContext):
-    text = update.message.text
-    context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"🔒 Анонимное сообщение:\n\n{text}")
-    update.message.reply_text("Сообщение отправлено анонимно ✅")
+@dp.message(Command("start"))
+async def start_cmd(message: Message):
+    await message.answer("Отправь мне анонимное сообщение — я пришлю его админу.", reply_markup=ReplyKeyboardRemove())
 
-def main():
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+@dp.message()
+async def handle_message(message: Message):
+    # Формируем анонимное сообщение
+    if message.text:
+        await bot.send_message(chat_id=ADMIN_CHAT_ID, text=f"🔒 Анонимное сообщение:\n\n{message.text}")
+        await message.answer("Сообщение отправлено анонимно ✅")
+    elif message.photo:
+        photo = message.photo[-1]
+        await bot.send_photo(chat_id=ADMIN_CHAT_ID, photo=photo.file_id, caption=f"🔒 Анонимное фото:\n\n{message.caption or ''}")
+        await message.answer("Фото отправлено анонимно ✅")
+    elif message.document:
+        doc = message.document
+        await bot.send_document(chat_id=ADMIN_CHAT_ID, document=doc.file_id, caption=f"🔒 Анонимный файл:\n\n{message.caption or ''}")
+        await message.answer("Файл отправлен анонимно ✅")
+    else:
+        await message.answer("Этот тип сообщений пока не поддерживается ❌")
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_text))
-
-    print("Бот запущен!")
-    updater.start_polling()
-    updater.idle()
+async def main():
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
